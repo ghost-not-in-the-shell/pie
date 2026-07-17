@@ -1,0 +1,51 @@
+name:                pie
+version:             0.1.0.0
+github:              "ghost-not-in-the-shell/pie"
+license:             BSD3
+author:              "gnits"
+maintainer:          "ghost.not.in.the.shell@gmail.com"
+description:         "Toy dependent type language for learning purpose"
+
+default-extensions:
+- BlockArguments
+- DataKinds
+- DeriveFunctor
+- DerivingVia
+- DuplicateRecordFields
+- FlexibleContexts
+- GADTs
+- LambdaCase
+- PatternSynonyms
+- PolyKinds
+- RankNTypes
+- TypeApplications
+- TypeOperators
+- UnicodeSyntax
+- ViewPatterns
+
+dependencies:
+- base >= 4.14 && < 5
+- effectful >= 2.3
+- parsec
+
+ghc-options:
+- -W
+
+library:
+  source-dirs: src
+
+executables:
+  pie-exe:
+    main: Main.hs
+    source-dirs: app
+    dependencies:
+    - pie
+
+tests:
+  pie-test:
+    main: Main.hs
+    source-dirs: test
+    dependencies:
+      - pie
+      - tasty
+      - tasty-hunit

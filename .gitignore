@@ -1,3 +1,4 @@
 .stack-work/
 pie.cabal
 *~
+*.agdai
