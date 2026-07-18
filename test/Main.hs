@@ -11,9 +11,9 @@ import Elab   (norm₀)
 identity ∷ (String , Raw , Tm)
 identity = ( "let id : (A : Set) (x : A) → A = λ A x ⇒ x in id"
            , R.Let "id" (R.Pi "A" R.Set $ R.Pi "x" (R.Var "A") $ R.Var "A")
-                        (R.Lam "A" $ R.Lam "x" $ R.Var "x")
+                        (R.lam "A" $ R.lam "x" $ R.Var "x")
            $ R.Var "id"
-           , lam "A" $ lam "x" $ T.FVar "x"
+           , T.lam "A" $ T.lam "x" $ T.FVar "x"
            )
 
 curry ∷ (String , Raw , Tm)
@@ -26,11 +26,11 @@ curry = ( "let curry : (A : Set) (B : Set) (C : Set) → (A × B → C) → (A �
                         $ R.Pi "_" (R.Pi "_" (R.Sg "_" (R.Var "A") (R.Var "B")) (R.Var "C"))
                         $ R.Pi "_" (R.Var "A") (R.Pi "_" (R.Var "B") (R.Var "C"))
                         )
-                        ( R.Lam "A" $ R.Lam "B" $ R.Lam "C" $ R.Lam "f" $ R.Lam "x" $ R.Lam "y"
+                        ( R.lam "A" $ R.lam "B" $ R.lam "C" $ R.lam "f" $ R.lam "x" $ R.lam "y"
                         $ R.App (R.Var "f") (R.Pair (R.Var "x") (R.Var "y"))
                         )
         $ R.Var "curry"
-        , lam "A" $ lam "B" $ lam "C" $ lam "f" $ lam "x" $ lam "y"
+        , T.lam "A" $ T.lam "B" $ T.lam "C" $ T.lam "f" $ T.lam "x" $ T.lam "y"
         $ T.App (T.FVar "f") (T.Pair (T.FVar "x") (T.FVar "y"))
         )
 
@@ -44,11 +44,11 @@ uncurry = ( "let uncurry : (A : Set) (B : Set) (C : Set) → (A → B → C) →
                             $ R.Pi "_" (R.Pi "_" (R.Var "A") (R.Pi "_" (R.Var "B") (R.Var "C")))
                             $ R.Pi "_" (R.Sg "_" (R.Var "A") (R.Var "B")) (R.Var "C")
                             )
-                            ( R.Lam "A" $ R.Lam "B" $ R.Lam "C" $ R.Lam "f" $ R.Lam "p"
+                            ( R.lam "A" $ R.lam "B" $ R.lam "C" $ R.lam "f" $ R.lam "p"
                             $ R.App (R.App (R.Var "f") (R.Fst (R.Var "p"))) (R.Snd (R.Var "p"))
                             )
           $ R.Var "uncurry"
-          , lam "A" $ lam "B" $ lam "C" $ lam "f" $ lam "p"
+          , T.lam "A" $ T.lam "B" $ T.lam "C" $ T.lam "f" $ T.lam "p"
           $ T.App (T.App (T.FVar "f") (T.Fst (T.FVar "p")))
                   (T.Snd (T.FVar "p"))
           )

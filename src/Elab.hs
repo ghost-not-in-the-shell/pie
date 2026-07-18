@@ -82,7 +82,7 @@ infer = \case
     t ← check t V.Enum
     return (T.Tag t , V.Set)
 
-  t@(R.Lam _ _) → throwError $ CantInfer t
+  t@(R.Lam _ _ _) → throwError $ CantInfer t
 
   R.App t u → do
     infer t >>= \case
@@ -150,7 +150,7 @@ check ∷ ( Reader Len :> es
         , Error  Msg :> es
         ) ⇒ Raw → VTy → Eff es Tm
 check t expected = case (t , expected) of
-  (R.Lam name body , V.Pi 𝕒 𝕓) → do
+  (R.Lam name _ body , V.Pi 𝕒 𝕓) → do
     body ← bind name 𝕒 \ x → check body (resume 𝕓 x)
     return $ T.Lam body
 

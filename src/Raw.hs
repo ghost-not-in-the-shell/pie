@@ -14,7 +14,7 @@ data Raw
   | Tag Raw
   | Case Raw Raw
 
-  | Lam Name Raw
+  | Lam Name (Maybe RTy) Raw
   | App Raw  Raw
 
   | Pair Raw Raw
@@ -34,3 +34,6 @@ data Raw
 
   | Let Name RTy Raw Raw
   deriving (Eq, Show)
+
+lam ∷ Name → Raw → Raw
+lam x body = Lam x Nothing body

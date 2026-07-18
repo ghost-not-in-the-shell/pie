@@ -4,7 +4,7 @@ import Data.Functor
 import Text.Parsec hiding (label)
 import Lexer
 import Var
-import Raw
+import Raw hiding (lam)
 
 -- TERM ∷= CELL+ "→" TERM
 --       | CELL+ "×" TERM
@@ -50,13 +50,28 @@ tm₁ = pi  <|> arrow
 tm₂ = sg  <|> prod
 tm₃ = fst <|> snd  <|> tag <|> su <|> case_ <|> app
 
+cell ∷ Parser (Name , Raw)
+cell = parens do
+  x ← name ; colon
+  𝕒 ← ty   ;
+  return (x , 𝕒)
+
+varOrCell ∷ Parser (Name , Maybe Raw)
+varOrCell
+  = (do
+      x ← name
+      return (x , Nothing)) <|>
+    (do
+      (x , 𝕒) ← cell
+      return (x , Just 𝕒))
+
 lam ∷ Parser Raw
 lam = do
   void $ reserved "λ" <|> reserved "fun"
-  xs   ← many1 name
+  xs   ← many1 varOrCell
   void $ symbol   "⇒" <|> symbol   "=>"
   body ← tm₀
-  return $ foldr Lam body xs
+  return $ foldr (uncurry Lam) body xs
 
 let_ ∷ Parser Raw
 let_ = do
@@ -66,12 +81,6 @@ let_ = do
   t    ← tm₀  ; reserved "in"
   body ← tm₀
   return $ Let x 𝕒 t body
-
-cell ∷ Parser (Name , Raw)
-cell = parens do
-  x ← name ; colon
-  𝕒 ← ty   ;
-  return (x , 𝕒)
 
 pi ∷ Parser RTy
 pi = try do

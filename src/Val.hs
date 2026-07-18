@@ -1,23 +1,21 @@
 module Val where
 import Var
-import Core
-
-newtype Clo tm = Clo (tm , Env)
-  deriving (Eq, Show)
 
 type Env = [Val]
 
+type Clo val = val → val
+
 type VTy = Val
 data Val
-  = Pi VTy (Clo Ty)
-  | Sg VTy (Clo Ty)
+  = Pi VTy (Clo VTy)
+  | Sg VTy (Clo VTy)
   | Set
   | Unit
   | Label
   | Enum
   | Tag Val
   
-  | Lam (Clo Tm)
+  | Lam (Clo Val)
 
   | Pair Val Val
 
@@ -32,11 +30,9 @@ data Val
   | Su Val
 
   | Stuck (Ne , VTy)
-  deriving (Eq, Show)
 
 data Ne
   = Var Lv
   | App Ne (Val , VTy)
   | Fst Ne
   | Snd Ne
-  deriving (Eq, Show)

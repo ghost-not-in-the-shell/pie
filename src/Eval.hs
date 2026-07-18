@@ -12,14 +12,13 @@ lookup (Ix i) = do
   ρ ← ask @Env
   return $ ρ !! i
 
-stop ∷ Reader Env :> es ⇒ Bnd tm → Eff es (Clo tm)
-stop (Bnd bnd) = do
+stop ∷ Reader Env :> es ⇒ Bnd Tm → Eff es (Clo Val)
+stop (Bnd body) = do
   ρ ← ask @Env
-  return $ Clo (bnd , ρ)
+  return \ t → evalIn (t:ρ) body
 
-resume ∷ Clo Tm → Val → Val
-resume (Clo (body , ρ)) t =
-  runPureEff . runReader (t : ρ) $ eval body
+resume ∷ Clo Val → Val → Val
+resume f t = f t
 
 app ∷ Val → Val → Val
 app t u = case t of
@@ -68,3 +67,6 @@ eval = \case
 
 eval₀ ∷ Tm → Val
 eval₀ = runPureEff . runReader @Env [] . eval
+
+evalIn ∷ Env → Tm → Val
+evalIn ρ = runPureEff . runReader @Env ρ . eval
