@@ -52,6 +52,7 @@ eval = \case
   T.Unit  → return V.Unit
   T.Label → return V.Label
   T.Enum  → return V.Enum
+  T.Tag  t   → V.Tag  <$> eval t
   T.Lam  t   → V.Lam  <$> stop t
   T.App  t u → app    <$> eval t <*> eval u
   T.Pair t u → V.Pair <$> eval t <*> eval u
@@ -61,6 +62,8 @@ eval = \case
   T.Tick l   → return (V.Tick l)
   T.Nil      → return  V.Nil
   T.Cons t u → V.Cons <$> eval t <*> eval u
+  T.Ze       → return  V.Ze
+  T.Su   t   → V.Su   <$> eval t
   T.Let  t u → resume <$> stop u <*> eval t
 
 eval₀ ∷ Tm → Val

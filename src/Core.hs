@@ -16,6 +16,7 @@ data Tm
   | Unit
   | Label
   | Enum
+  | Tag Tm
 
   | Lam (Bnd Tm)
   | App Tm Tm
@@ -30,6 +31,9 @@ data Tm
 
   | Nil
   | Cons Tm Tm
+
+  | Ze
+  | Su Tm
 
   | Let Tm (Bnd Tm)
   deriving (Eq, Show)
@@ -50,6 +54,7 @@ close name = Bnd . go 0
           Unit     → Unit
           Label    → Label
           Enum     → Enum
+          Tag  t   → Tag  (go  acc t)
           Lam  t   → Lam  (bnd acc t)
           App  t u → App  (go  acc t) (go acc u)
           Pair t u → Pair (go  acc t) (go acc u)
@@ -59,18 +64,20 @@ close name = Bnd . go 0
           Tick l   → Tick l
           Nil      → Nil
           Cons t u → Cons (go  acc t) (go  acc u)
+          Ze       → Ze
+          Su   t   → Su   (go  acc t)
           Let  t u → Let  (go  acc t) (bnd acc u)
 
-pi ∷ Name → Tm → Tm → Tm
+pi ∷ Name → Ty → Ty → Ty
 pi x 𝕒 𝕓 = Pi 𝕒 (close x 𝕓)
 
-arrow ∷ Tm → Tm → Tm
+arrow ∷ Ty → Ty → Ty
 arrow 𝕒 𝕓 = pi "_" 𝕒 𝕓
 
-sg ∷ Name → Tm → Tm → Tm
+sg ∷ Name → Ty → Ty → Ty
 sg x 𝕒 𝕓 = Sg 𝕒 (close x 𝕓)
 
-prod ∷ Tm → Tm → Tm
+prod ∷ Ty → Ty → Ty
 prod 𝕒 𝕓 = sg "_" 𝕒 𝕓
 
 lam ∷ Name → Tm → Tm

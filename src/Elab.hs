@@ -16,25 +16,25 @@ data Msg = OutOfScope
          | NotAFunction Raw
          | NotAPair     Raw
          | CantInfer    Raw
+         | RequireNonEmpty
+         | TagNotInEnum
          | TypeMismatch
          deriving (Eq, Show)
 
-find ∷ Eq a ⇒ a → [(a , b)] → Maybe (Int , b)
-find expected es = go 0 es
+find ∷ (a → Bool) → [a] → Maybe (Int , a)
+find f xs = go 0 xs
   where go acc = \case
           [] → Nothing
-          ((actual,elem):es) →
-            if expected == actual
-            then Just (acc , elem)
-            else go (1 + acc) es
+          (x:xs) | f x       → Just (acc , x)
+                 | otherwise → go (1+acc) xs
 
 var ∷ ( Reader Ctx :> es
       , Error  Msg :> es
       ) ⇒ Name → Eff es (Tm , VTy)
 var name = do
   γ ← ask @Ctx
-  case find name γ of
-    Just (i , 𝕒) → return (T.BVar (Ix i) , 𝕒)
+  case find (\(x , _)  → x == name) γ of
+    Just (i , (_ , 𝕒)) → return (T.BVar (Ix i) , 𝕒)
     Nothing → throwError OutOfScope
 
 bind ∷ ( Reader Len :> es
@@ -78,6 +78,10 @@ infer = \case
   R.Label → return (T.Label , V.Set)
   R.Enum  → return (T.Enum  , V.Set)
 
+  R.Tag t → do
+    t ← check t V.Enum
+    return (T.Tag t , V.Set)
+
   t@(R.Lam _ _) → throwError $ CantInfer t
 
   R.App t u → do
@@ -110,10 +114,27 @@ infer = \case
 
   R.Brace [] → return (T.Nil , V.Enum)
 
-  R.Brace (t : ts) → do
-    t  ← check t V.Label
-    ts ← check (R.Brace ts) V.Enum
-    return $ (T.Cons t ts , V.Enum)
+  R.Brace (l : e) → do
+    l ← check l           V.Label
+    e ← check (R.Brace e) V.Enum
+    return (T.Cons l e , V.Enum)
+
+  t@(R.Ze     ) → throwError $ CantInfer t
+  t@(R.Su    _) → throwError $ CantInfer t
+  t@(R.Sharp _) → throwError $ CantInfer t
+
+{-
+  R.Switch branches → do
+    let ls = map Prelude.fst branches
+    let ts = map Prelude.snd branches
+    let eᵣ = R.Brace (map R.Tick ls)
+    let case_ ∷ [a] → Val → Val
+        case_ = undefined
+    (_ , 𝕡) ← infer (head ts)
+    eₜ ← check            eᵣ   V.Enum
+    ts ← check (R.Bracket ts) (case_ ls 𝕡)
+    return (undefined , V.Pi (eval₀ eₜ) undefined)
+-}
 
   R.Let name 𝕒 t body → do
     𝕒  ← check 𝕒 V.Set
@@ -142,6 +163,22 @@ check t expected = case (t , expected) of
     t  ← check t 𝕒
     ts ← check (R.Bracket ts) =<< (resume 𝕓 <$> eval t)
     return $ T.Pair t ts
+
+  (R.Ze , V.Tag e) → case e of
+    V.Cons _ _ → return T.Ze
+    _ → throwError RequireNonEmpty
+
+  (R.Su t , V.Tag e) → case e of
+    V.Cons _ e → do
+      t ← check t (V.Tag e)
+      return $ T.Su t
+    _ → throwError RequireNonEmpty
+
+  (R.Sharp l , V.Tag e) → case e of
+    V.Cons (V.Tick this) e → if l == this
+                    then return T.Ze
+                    else T.Su <$> check (R.Sharp l) (V.Tag e)
+    _ → throwError TagNotInEnum
 
   _ → do
     (t , actual) ← infer t

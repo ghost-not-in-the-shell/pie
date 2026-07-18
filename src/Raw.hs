@@ -11,6 +11,8 @@ data Raw
   | Unit
   | Label
   | Enum
+  | Tag Raw
+  | Case Raw Raw
 
   | Lam Name Raw
   | App Raw  Raw
@@ -24,6 +26,11 @@ data Raw
   | Tick String
 
   | Brace [Raw]
+
+  | Ze
+  | Su Raw
+  | Sharp String
+  | Switch [(String , Raw)]
 
   | Let Name RTy Raw Raw
   deriving (Eq, Show)

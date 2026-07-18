@@ -71,25 +71,104 @@ module Original where
   Case []      P = ⊤
   Case (l ∷ 𝔼) P = P ze × Case 𝔼 (P ∘ su)
 
-  case : ∀ {ℓ} (𝔼 : Enum) (P : Tag 𝔼 → Set ℓ)
+  switch : ∀ {ℓ} {𝔼 : Enum} (P : Tag 𝔼 → Set ℓ)
     → (cs : Case 𝔼 P)
     → (t : Tag 𝔼) → P t
-  case (l ∷ 𝔼) P (c , cs)  ze    = c
-  case (l ∷ 𝔼) P (c , cs) (su t) = case 𝔼 (P ∘ su) cs t
+  switch {𝔼 = l ∷ 𝔼} P (c , cs)  ze    = c
+  switch {𝔼 = l ∷ 𝔼} P (c , cs) (su t) = switch (P ∘ su) cs t
 
-  Case′ : ∀ {ℓ} (𝔼 : Enum) (P : Tag 𝔼 → Set ℓ) → Set ℓ
-  Case′ {ℓ} = elimEnum
-    (λ 𝔼 → (P : Tag 𝔼 → Set ℓ) → Set ℓ)
-    (λ P → ⊤)
-    (λ l 𝔼 ind P → P ze × ind (P ∘ su))
+  [nil,cons] : Enum
+  [nil,cons] = "nil" ∷ "cons" ∷ []
 
-  case′ : ∀ {ℓ} (𝔼 : Enum) (P : Tag 𝔼 → Set ℓ)
-    → (cs : Case′ 𝔼 P)
-    → (t : Tag 𝔼) → P t
-  case′ {ℓ} 𝔼 P cs t = elimTag
-    (λ {𝔼} t → (P : Tag 𝔼 → Set ℓ) → Case′ 𝔼 P → P t)
-    (λ P (c , cs) → c)
-    (λ t ind P (c , cs) → ind (P ∘ su) cs)
-    t
-    P
-    cs
+  pattern ‘nil  = ze
+  pattern ‘cons = su ze
+
+  nilD : Desc
+  nilD = end
+
+  consD : Desc
+  consD = arg Label $ const $ rec end
+
+  nilD+consD : Tag [nil,cons] → Desc
+  nilD+consD = switch (const Desc)
+    ( nilD
+    , consD
+    , tt )
+
+  EnumD : Desc
+  EnumD = arg (Tag [nil,cons]) nilD+consD
+
+module Jiawei where
+  Enum : Set
+  Enum = List Label
+
+  recEnum : ∀ {ℓ} {X : Set ℓ}
+    → X
+    → (Label → X → X)
+    → Enum → X
+  recEnum n c []      = n
+  recEnum n c (l ∷ 𝔼) = c l (recEnum n c 𝔼)
+
+  data Tag : Enum → Set where
+    ze : ∀ {l 𝔼}         → Tag (l ∷ 𝔼)
+    su : ∀ {l 𝔼} → Tag 𝔼 → Tag (l ∷ 𝔼)
+
+  recTag : ∀ {ℓ} (X : Enum → Set ℓ)
+    → (∀ {l 𝔼}       → X (l ∷ 𝔼))
+    → (∀ {l 𝔼} → X 𝔼 → X (l ∷ 𝔼))
+    → {𝔼 : Enum} → Tag 𝔼 → X 𝔼
+  recTag X z s  ze    = z
+  recTag X z s (su t) = s (recTag X z s t)
+
+  Case : (𝔼 : Enum) → Set₁
+  Case []      = ⊤
+  Case (l ∷ 𝔼) = Desc × Case 𝔼
+
+  -- this is just algebra of Enum
+  Case'' : ∀ {ℓ} (𝔼 : Enum) (X : Set ℓ) → Set (lsuc ℓ)
+  Case'' []      X = ⊤
+  Case'' (l ∷ 𝔼) X = X × Case'' 𝔼 X
+
+  Case' : (𝔼 : Enum) → Set₁
+  Case' = recEnum ⊤ (λ _ → Desc ×_)
+
+  switch : {𝔼 : Enum}
+    → Case 𝔼
+    → Tag  𝔼 → Desc
+  switch (c , cs)  ze    = c
+  switch (c , cs) (su t) = switch cs t
+
+  switch'' : ∀ {ℓ} {𝔼 : Enum} {X : Set ℓ}
+    → Case'' 𝔼 X
+    → Tag 𝔼 → X
+  switch'' (c , cs)  ze    = c
+  switch'' (c , cs) (su t) = switch'' cs t
+
+  switch' : {𝔼 : Enum}
+    → Case' 𝔼
+    → Tag   𝔼 → Desc
+  switch' cs t = recTag (λ 𝔼 → Case' 𝔼 → Desc)
+    (λ cs → fst cs)
+    (λ ih cs → ih (snd cs))
+    t cs
+
+  [nil,cons] : Enum
+  [nil,cons] = "nil" ∷ "cons" ∷ []
+
+  pattern ‘nil  = ze
+  pattern ′cons = su ze
+
+  nilD : Desc
+  nilD = end
+
+  consD : Desc
+  consD = arg Label $ const $ rec end
+
+  nilD+consD : Tag [nil,cons] → Desc
+  nilD+consD = switch''
+    ( nilD
+    , consD
+    , tt )
+
+  EnumD : Desc
+  EnumD = arg (Tag [nil,cons]) nilD+consD

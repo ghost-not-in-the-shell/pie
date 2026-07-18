@@ -17,8 +17,8 @@ lexer = makeTokenParser LanguageDef
   , reservedOpNames = undefined
   , identStart      = letter
   , identLetter     = alphaNum <|> char '_' <|> char '\''
-  , reservedNames   = [ "Set", "𝟙", "Unit", "Label", "Enum"
-                      , "λ", "fun", "pair", "fst", "snd"
+  , reservedNames   = [ "Set", "𝟙", "Unit", "Label", "Enum", "Tag", "Case"
+                      , "λ", "fun", "fst", "snd", "ze", "su"
                       , "let", "in" ]
   }
 
@@ -27,6 +27,9 @@ name = Token.identifier lexer
 
 label ∷ Parser String
 label = char '\'' >> Token.identifier lexer
+
+index ∷ Parser String
+index = char '#' >> Token.identifier lexer
 
 reserved ∷ String → Parser ()
 reserved = Token.reserved lexer

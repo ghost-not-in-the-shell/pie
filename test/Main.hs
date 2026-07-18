@@ -18,7 +18,7 @@ identity = ( "let id : (A : Set) (x : A) → A = λ A x ⇒ x in id"
 
 curry ∷ (String , Raw , Tm)
 curry = ( "let curry : (A : Set) (B : Set) (C : Set) → (A × B → C) → (A → B → C) " ++
-                    "= λ A B C f x y ⇒ f (pair x y) " ++
+                    "= λ A B C f x y ⇒ f (x , y) " ++
           "in curry"
         , R.Let "curry" ( R.Pi "A" R.Set
                         $ R.Pi "B" R.Set

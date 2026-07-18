@@ -15,6 +15,7 @@ data Val
   | Unit
   | Label
   | Enum
+  | Tag Val
   
   | Lam (Clo Tm)
 
@@ -26,6 +27,9 @@ data Val
 
   | Nil
   | Cons Val Val
+
+  | Ze
+  | Su Val
 
   | Stuck (Ne , VTy)
   deriving (Eq, Show)

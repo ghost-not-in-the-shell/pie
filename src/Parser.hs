@@ -8,7 +8,9 @@ import Raw
 
 -- TERM ∷= CELL+ "→" TERM
 --       | CELL+ "×" TERM
---       | "pair" ATOM ATOM | "fst" ATOM | "snd" ATOM
+--       | "fst" ATOM | "snd" ATOM
+--       | "Tag" ATOM | "su"  ATOM
+--       | "Case" ATOM ATOM
 --       | "λ"   NAME+ "⇒" TERM
 --       | "let" NAME  ":" TERM "=" TERM "in" TERM
 --       | APP
@@ -19,7 +21,10 @@ import Raw
 --
 -- ATOM ∷= NAME
 --       | LABEL
+--       | INDEX
 --       | "Set" | "Unit" | "Label" | "Enum"
+--       | "ze"
+--       | "(" TERM "," TERM ")"
 --       | "[" TERM*   { "," TERM   } "]"
 --       | "{" TERM*   { "," TERM   } "}"
 --       | "{" BRANCH* { ";" BRANCH } "}"
@@ -27,7 +32,9 @@ import Raw
 --
 -- LABEL ∷= "'" ID
 --
--- BRANCH ∷= LABEL "⇒" TERM
+-- INDEX ∷= "#" ID
+--
+-- BRANCH ∷= INDEX "⇒" TERM
 
 prog ∷ Parser Raw
 prog = whiteSpace *> tm₀ <* eof
@@ -38,10 +45,10 @@ parseProg = parse prog "<stdin>"
 ty ∷ Parser RTy
 ty = tm₀
 
-tm₀ = lam  <|> let_ <|> tm₁
-tm₁ = pi   <|> arrow
-tm₂ = sg   <|> prod
-tm₃ = pair <|> fst <|> snd  <|> app
+tm₀ = lam <|> let_ <|> tm₁
+tm₁ = pi  <|> arrow
+tm₂ = sg  <|> prod
+tm₃ = fst <|> snd  <|> tag <|> su <|> case_ <|> app
 
 lam ∷ Parser Raw
 lam = do
@@ -96,14 +103,20 @@ prod = do
     𝕓 ← tm₂
     return $ Sg "_" 𝕒 𝕓
 
-pair ∷ Parser Raw
-pair = reserved "pair" >> Pair <$> atom <*> atom
-
 fst ∷ Parser Raw
 fst = reserved "fst" >> Fst <$> atom
 
 snd ∷ Parser Raw
 snd = reserved "snd" >> Snd <$> atom
+
+tag ∷ Parser Raw
+tag = reserved "Tag" >> Tag <$> atom
+
+su ∷ Parser Raw
+su = reserved "su" >> Su <$> atom
+
+case_ ∷ Parser Raw
+case_ = reserved "Case" >> Case <$> atom <*> atom
 
 app ∷ Parser Raw
 app = do
@@ -113,9 +126,12 @@ app = do
 atom ∷ Parser Raw
 atom = var
    <|> set <|> unit <|> labelTy <|> enum
-   <|> tick   
+   <|> tick
+   <|> ze
+   <|> pair
    <|> bracket
    <|> brace
+   <|> switch
    <|> parens tm₀
 
 var ∷ Parser Raw
@@ -136,8 +152,30 @@ enum = reserved "Enum" $> Enum
 tick ∷ Parser Raw
 tick = Tick <$> label
 
+sharp ∷ Parser Raw
+sharp = Sharp <$> index
+
+ze ∷ Parser Raw
+ze = reserved "ze" $> Ze
+
+pair ∷ Parser Raw
+pair = try $ parens do
+  t ← tm₀ ; void $ comma
+  u ← tm₀
+  return $ Pair t u
+
 bracket ∷ Parser Raw
 bracket = Bracket <$> brackets (commaSep tm₀)
 
 brace ∷ Parser Raw
-brace = Brace <$> braces (commaSep tm₀)
+brace = try $ Brace <$> braces (commaSep tm₀)
+
+branch ∷ Parser (String , Raw)
+branch = do
+  l ← index
+  void $ symbol "⇒" <|> symbol "=>"
+  t ← tm₀
+  return (l , t)
+
+switch ∷ Parser Raw
+switch = Switch <$> braces (semiSep1 branch)

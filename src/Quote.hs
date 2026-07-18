@@ -32,6 +32,7 @@ quoteTy = \case
   V.Unit  → return T.Unit
   V.Label → return T.Label
   V.Enum  → return T.Enum
+  V.Tag e → T.Tag <$> quote V.Enum e
 
   V.Stuck (ne , V.Set) → quoteNe ne
 
@@ -61,10 +62,10 @@ quote 𝕒 t = case 𝕒 of
 
   V.Enum → case t of
     V.Nil → return T.Nil
-    V.Cons l ls → do
-      l  ← quote V.Label l
-      ls ← quote V.Enum  ls
-      return $ T.Cons l ls
+    V.Cons l e → do
+      l ← quote V.Label l
+      e ← quote V.Enum  e
+      return $ T.Cons l e
     V.Stuck (ne , V.Enum) → quoteNe ne
     _ → impossible
 
