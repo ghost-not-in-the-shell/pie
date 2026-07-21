@@ -16,6 +16,8 @@ data Tm
   | Unit
   | Label
   | Enum
+  | Desc
+  | Nat
   | Tag Tm
 
   | Lam (Bnd Tm)
@@ -31,9 +33,21 @@ data Tm
 
   | Nil
   | Cons Tm Tm
+  | ElimEnum Tm Tm Tm Tm
+  | Case Tm Tm
 
-  | Ze
-  | Su Tm
+  | Ze Tm Tm
+  | Su Tm Tm Tm
+  | ElimTag Tm Tm Tm Tm
+  | Switch Tm Tm Tm
+
+  | Zero
+  | Suc Tm
+
+  | End
+  | Arg Tm Tm
+  | Rec Tm
+  | El Tm Tm
 
   | Let Tm (Bnd Tm)
   deriving (Eq, Show)
@@ -54,19 +68,46 @@ close name = Bnd . go 0
           Unit     → Unit
           Label    → Label
           Enum     → Enum
+          Desc     → Desc
+          Nat      → Nat
           Tag  t   → Tag  (go  acc t)
           Lam  t   → Lam  (bnd acc t)
           App  t u → App  (go  acc t) (go acc u)
           Pair t u → Pair (go  acc t) (go acc u)
           Fst  t   → Fst  (go  acc t)
           Snd  t   → Snd  (go  acc t)
+          Zero     → Zero
+          Suc  t   → Suc  (go  acc t)
           Sole     → Sole
           Tick l   → Tick l
           Nil      → Nil
           Cons t u → Cons (go  acc t) (go  acc u)
-          Ze       → Ze
-          Su   t   → Su   (go  acc t)
+          End      → End
+          Arg  t u → Arg  (go  acc t) (go  acc u)
+          Rec  t   → Rec  (go  acc t)
+          Case e p → Case (go  acc e) (go  acc p)
           Let  t u → Let  (go  acc t) (bnd acc u)
+          Ze l e   → Ze (go acc l) (go acc e)
+          Su l e t → Su (go acc l) (go acc e) (go acc t)
+          ElimEnum scrut mot nil cons →
+            ElimEnum (go acc scrut)
+                     (go acc mot)
+                     (go acc nil)
+                     (go acc cons)
+
+          ElimTag scrut mot ze su →
+            ElimTag (go acc scrut)
+                    (go acc mot)
+                    (go acc ze)
+                    (go acc su)
+
+          Switch t p cs →
+            Switch (go acc t)
+                   (go acc p)
+                   (go acc cs)
+
+          El d x →
+            El (go acc d) (go acc x)
 
 pi ∷ Name → Ty → Ty → Ty
 pi x 𝕒 𝕓 = Pi 𝕒 (close x 𝕓)
@@ -85,3 +126,18 @@ lam x t = Lam (close x t)
 
 let_ ∷ Name → Tm → Tm → Tm
 let_ x body t = Let body (close x t)
+
+nat ∷ Integer → Tm
+nat n | n == 0    = Zero
+      | otherwise = Suc (nat (n-1))
+
+{-
+case_ ∷ Tm → Tm → Tm
+case_ e p = ElimEnum e
+  (lam "e" $ (Tag (FVar "e") `arrow` Set) `App` Set)
+  (lam "P" $ Unit)
+  (lam "l" $ lam "e" $ lam "ind" $ lam "P"
+   (FVar "P" `App` (Ze (FVar "l") (FVar "e"))) `prod`
+   (FVar "ind" `App` (lam "t" $ FVar "P" `App` Su (FVar "l") (FVar "e") (FVar "t"))))
+  `App` p
+-}

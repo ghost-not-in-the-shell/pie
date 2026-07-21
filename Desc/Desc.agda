@@ -45,6 +45,17 @@ ind : ∀ {ℓ} (𝔻 : Desc) (P : μ 𝔻 → Set ℓ)
   → (d : μ 𝔻) → P d
 ind 𝔻 P ϕ ⟨ ds ⟩ = ϕ ds (all 𝔻 (μ 𝔻) P (ind 𝔻 P ϕ) ds)
 
+map : (𝔻 : Desc) {X Y : Set} → (X → Y) → ⟦ 𝔻 ⟧ X → ⟦ 𝔻 ⟧ Y
+map (end    ) f tt       = tt
+map (arg S 𝔻) f (s , xs) = s   , map (𝔻 s) f xs
+map (rec   𝔻) f (x , xs) = f x , map  𝔻    f xs
+
+{-# TERMINATING #-}
+fold : {𝔻 : Desc} {X : Set}
+  → (⟦ 𝔻 ⟧ X → X)
+  → μ 𝔻 → X
+fold {𝔻} ϕ ⟨ ds ⟩ = ϕ (map 𝔻 (fold ϕ) ds)
+
 module Original where
   Enum : Set
   Enum = List Label
@@ -60,12 +71,12 @@ module Original where
     ze : ∀ {l 𝔼}         → Tag (l ∷ 𝔼)
     su : ∀ {l 𝔼} → Tag 𝔼 → Tag (l ∷ 𝔼)
 
-  elimTag : ∀ {ℓ} (mot : ∀ {𝔼} → Tag 𝔼 → Set ℓ)
-    → (∀ {l 𝔼} → mot {l ∷ 𝔼} ze)
-    → (∀ {l 𝔼} (t : Tag 𝔼) → mot {𝔼} t → mot {l ∷ 𝔼} (su t))
-    → ∀ {𝔼} (t : Tag 𝔼) → mot {𝔼} t
-  elimTag P zcase scase {l ∷ 𝔼}  ze    = zcase
-  elimTag P zcase scase {l ∷ 𝔼} (su t) = scase t (elimTag P zcase scase t)
+  elimTag : ∀ {ℓ} (mot : ∀ 𝔼 → Tag 𝔼 → Set ℓ)
+    → (∀ l 𝔼 → mot (l ∷ 𝔼) ze)
+    → (∀ l 𝔼 (t : Tag 𝔼) → mot 𝔼 t → mot (l ∷ 𝔼) (su t))
+    → ∀ {𝔼} (t : Tag 𝔼) → mot 𝔼 t
+  elimTag P zcase scase {l ∷ 𝔼}  ze    = zcase l 𝔼
+  elimTag P zcase scase {l ∷ 𝔼} (su t) = scase l 𝔼 t (elimTag P zcase scase t)
 
   Case : ∀ {ℓ} (𝔼 : Enum) (P : Tag 𝔼 → Set ℓ) → Set ℓ
   Case []      P = ⊤
@@ -74,8 +85,26 @@ module Original where
   switch : ∀ {ℓ} {𝔼 : Enum} (P : Tag 𝔼 → Set ℓ)
     → (cs : Case 𝔼 P)
     → (t : Tag 𝔼) → P t
-  switch {𝔼 = l ∷ 𝔼} P (c , cs)  ze    = c
-  switch {𝔼 = l ∷ 𝔼} P (c , cs) (su t) = switch (P ∘ su) cs t
+  switch {𝔼 = l ∷ 𝔼} P cs  ze    = fst cs
+  switch {𝔼 = l ∷ 𝔼} P cs (su t) = switch (P ∘ su) (snd cs) t
+
+  Case′ : ∀ {ℓ} (𝔼 : Enum) (P : Tag 𝔼 → Set ℓ) → Set ℓ
+  Case′ {ℓ} 𝔼 P = elimEnum
+    (λ 𝔼 → (Tag 𝔼 → Set ℓ) → Set ℓ)
+    (λ P → ⊤)
+    (λ l 𝔼 ind P → P (ze {l} {𝔼}) × ind (λ t → P (su {l} {𝔼} t)))
+    𝔼 P
+
+  switch′ : ∀ {ℓ} {𝔼 : Enum} (P : Tag 𝔼 → Set ℓ)
+    → (cs : Case′ 𝔼 P)
+    → (t : Tag 𝔼) → P t
+  switch′ {ℓ} P cs t = elimTag
+    (λ 𝔼 t → (P : Tag 𝔼 → Set ℓ) → Case′ 𝔼 P → P t)
+    (λ l 𝔼 P (c , cs) → c)
+    (λ l 𝔼 t ind P (c , cs) → ind (P ∘ su {l} {𝔼}) cs)
+    t
+    P
+    cs
 
   [nil,cons] : Enum
   [nil,cons] = "nil" ∷ "cons" ∷ []
@@ -172,3 +201,40 @@ module Jiawei where
 
   EnumD : Desc
   EnumD = arg (Tag [nil,cons]) nilD+consD
+
+  [ze,su] : Enum
+  [ze,su] = "ze" ∷ "su" ∷ []
+
+  pattern ‘ze = ze
+  pattern ‘su = su ze
+
+  zeD : Desc
+  zeD = end
+
+  suD : Desc
+  suD = rec end
+
+  zeD+suD : Tag [ze,su] → Desc
+  zeD+suD = switch
+    ( zeD
+    , suD
+    , tt )
+
+  NatD : Desc
+  NatD = arg (Tag [ze,su]) $ zeD+suD
+
+  Nat : Set
+  Nat = μ NatD
+
+{-
+  toℕ : Nat → ℕ
+  toℕ = fold $ λ { (‘ze , t) → {!!}
+                 ; (‘su , y) → {!!} }
+
+  Toℕ : Nat → Set
+  Toℕ = λ _ → ℕ
+
+  toℕ' : Nat → ℕ
+  toℕ' = ind NatD Toℕ λ { (‘ze , t) → {!!}
+                        ; (‘su , y) → {!!} }
+-}

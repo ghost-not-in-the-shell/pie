@@ -8,7 +8,7 @@ import Raw  as R
 import Core as T
 import Val  as V
 import Eval
-import Quote (fresh, quote, conv)
+import Quote (fresh, quoteTy, quote, conv)
 
 type Ctx = [(Name , VTy)]
 
@@ -77,12 +77,24 @@ infer = \case
   R.Unit  → return (T.Unit  , V.Set)
   R.Label → return (T.Label , V.Set)
   R.Enum  → return (T.Enum  , V.Set)
+  R.Nat   → return (T.Nat   , V.Set)
+  R.Desc  → return (T.Desc  , V.Set)
 
   R.Tag t → do
     t ← check t V.Enum
     return (T.Tag t , V.Set)
 
-  t@(R.Lam _ _ _) → throwError $ CantInfer t
+  t@(R.Lam _ Nothing _) → throwError $ CantInfer t
+
+  R.Lam name (Just 𝕒) body → do
+    𝕒  ← check 𝕒 V.Set
+    𝕒ᵥ ← eval  𝕒
+    Bnd (body , 𝕓) ← bind name 𝕒ᵥ \ _ → do
+      (body , 𝕓ᵥ) ← infer body
+      𝕓 ← quoteTy 𝕓ᵥ
+      return (body , 𝕓)
+    ty ← eval $ T.Pi 𝕒 (Bnd 𝕓)
+    return (T.Lam (Bnd body) , ty)
 
   R.App t u → do
     infer t >>= \case
@@ -112,6 +124,12 @@ infer = \case
 
   R.Tick l → return (T.Tick l , V.Label)
 
+  R.Nil → return (T.Nil , V.Enum)
+  R.Cons l e → do
+    l ← check l V.Label
+    e ← check e V.Enum
+    return (T.Cons l e , V.Enum)
+
   R.Brace [] → return (T.Nil , V.Enum)
 
   R.Brace (l : e) → do
@@ -119,22 +137,77 @@ infer = \case
     e ← check (R.Brace e) V.Enum
     return (T.Cons l e , V.Enum)
 
+  R.ElimEnum scrut mot nil cons → do
+    scrut  ← check scrut V.Enum
+    scrutᵥ ← eval  scrut
+    let motTy = V.Enum `V.arrow` V.Set
+    mot  ← check mot motTy
+    motᵥ ← eval  mot
+    let nilTy  = motᵥ `app` V.Nil
+    let consTy = V.pi V.Label \ l →
+                 V.pi V.Enum  \ e →
+                 (motᵥ `app` e) `V.arrow` (motᵥ `app` V.Cons l e)
+    nil  ← check nil  nilTy
+    cons ← check cons consTy
+    return (T.ElimEnum scrut mot nil cons , motᵥ `app` scrutᵥ)
+
+  R.Zero → return (T.Zero , V.Nat)
+  R.Suc n → do
+    n ← check n V.Nat
+    return (T.Suc n , V.Nat)
+
+  R.End → return (T.End , V.Desc)
+
+  R.Arg s d → do
+    sₜ ← check s  V.Set
+    sᵥ ← eval  sₜ
+    d  ← check d (sᵥ `V.arrow` V.Desc)
+    return (T.Arg sₜ d , V.Desc)
+
+  R.Rec d → do
+    d ← check d V.Desc
+    return (T.Rec d , V.Desc)
+
   t@(R.Ze     ) → throwError $ CantInfer t
   t@(R.Su    _) → throwError $ CantInfer t
   t@(R.Sharp _) → throwError $ CantInfer t
 
-{-
-  R.Switch branches → do
-    let ls = map Prelude.fst branches
-    let ts = map Prelude.snd branches
-    let eᵣ = R.Brace (map R.Tick ls)
-    let case_ ∷ [a] → Val → Val
-        case_ = undefined
-    (_ , 𝕡) ← infer (head ts)
-    eₜ ← check            eᵣ   V.Enum
-    ts ← check (R.Bracket ts) (case_ ls 𝕡)
-    return (undefined , V.Pi (eval₀ eₜ) undefined)
--}
+  R.ElimTag scrut mot ze su →
+    infer scrut >>= \case
+      (scrut , V.Tag e) → do
+        scrutᵥ ← eval scrut
+        let motTy = V.pi V.Enum \ e -> V.Tag e `V.arrow` V.Set
+        mot  ← check mot motTy
+        motᵥ ← eval  mot
+        let zeTy = V.pi V.Label \ l →
+                   V.pi V.Enum  \ e →
+                   motᵥ `app` V.Cons l e `app` V.Ze l e
+        let suTy = V.pi  V.Label  \ l →
+                   V.pi  V.Enum   \ e →
+                   V.pi (V.Tag e) \ t →
+                   (motᵥ `app` e `app` t) `V.arrow` (motᵥ `app` V.Cons l e `app` V.Su l e t)
+        ze ← check ze zeTy
+        su ← check su suTy
+        return (T.ElimTag scrut mot ze su , motᵥ `app` e `app` scrutᵥ)
+      _ → throwError $ TypeMismatch
+
+  R.Case e p → do
+    eₜ ← check e V.Enum
+    eᵥ ← eval  eₜ
+    p  ← check p (V.Tag eᵥ `V.arrow` V.Set)
+    return (T.Case eₜ p , V.Set)
+
+  R.Switch t p branches → do
+    let eᵣ = R.Brace   $ map (R.Tick . Prelude.fst) branches
+    let ϕᵣ = R.Bracket $ map           Prelude.snd  branches
+    eₜ ← check eᵣ  V.Enum
+    eᵥ ← eval  eₜ
+    tₜ ← check t  (V.Tag eᵥ)
+    tᵥ ← eval  tₜ
+    pₜ ← check p  (V.Tag eᵥ `V.arrow` V.Set)
+    pᵥ ← eval  pₜ
+    ϕₜ ← check ϕᵣ (Eval.case_ eᵥ pᵥ)
+    return (T.Switch tₜ pₜ ϕₜ , pᵥ `app` tᵥ)
 
   R.Let name 𝕒 t body → do
     𝕒  ← check 𝕒 V.Set
@@ -165,19 +238,17 @@ check t expected = case (t , expected) of
     return $ T.Pair t ts
 
   (R.Ze , V.Tag e) → case e of
-    V.Cons _ _ → return T.Ze
+    V.Cons l e → T.Ze <$> quote V.Label l <*> quote V.Enum e
     _ → throwError RequireNonEmpty
 
   (R.Su t , V.Tag e) → case e of
-    V.Cons _ e → do
-      t ← check t (V.Tag e)
-      return $ T.Su t
+    V.Cons l e → T.Su <$> quote V.Label l <*> quote V.Enum e <*> check t (V.Tag e)
     _ → throwError RequireNonEmpty
 
   (R.Sharp l , V.Tag e) → case e of
     V.Cons (V.Tick this) e → if l == this
-                    then return T.Ze
-                    else T.Su <$> check (R.Sharp l) (V.Tag e)
+                    then T.Ze (T.Tick this) <$> quote V.Enum e
+                    else T.Su (T.Tick this) <$> quote V.Enum e <*> check (R.Sharp l) (V.Tag e)
     _ → throwError TagNotInEnum
 
   _ → do

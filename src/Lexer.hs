@@ -17,8 +17,8 @@ lexer = makeTokenParser LanguageDef
   , reservedOpNames = undefined
   , identStart      = letter
   , identLetter     = alphaNum <|> char '_' <|> char '\''
-  , reservedNames   = [ "Set", "𝟙", "Unit", "Label", "Enum", "Tag", "Case"
-                      , "λ", "fun", "fst", "snd", "ze", "su"
+  , reservedNames   = [ "Set", "𝟙", "Unit", "Label", "Enum", "Desc", "ℕ", "Nat", "Tag", "Case"
+                      , "λ", "fun", "fst", "snd", "nil", "cons", "elimEnum", "ze", "su", "elimTag", "switch", "end", "arg", "rec", "zero", "suc"
                       , "let", "in" ]
   }
 

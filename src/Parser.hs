@@ -8,9 +8,11 @@ import Raw hiding (lam)
 
 -- TERM ∷= CELL+ "→" TERM
 --       | CELL+ "×" TERM
+--       | "Case" ATOM ATOM | "Tag" ATOM
 --       | "fst" ATOM | "snd" ATOM
---       | "Tag" ATOM | "su"  ATOM
---       | "Case" ATOM ATOM
+--       | "cons" ATOM ATOM | "elimEnum" ATOM ATOM ATOM ATOM
+--       | "su"   ATOM      | "elimTag" ATOM ATOM ATOM ATOM
+--       | "arg" ATOM ATOM | "rec" ATOM
 --       | "λ"   NAME+ "⇒" TERM
 --       | "let" NAME  ":" TERM "=" TERM "in" TERM
 --       | APP
@@ -22,12 +24,14 @@ import Raw hiding (lam)
 -- ATOM ∷= NAME
 --       | LABEL
 --       | INDEX
---       | "Set" | "Unit" | "Label" | "Enum"
+--       | "Set" | "Unit" | "Label" | "Enum" | "Desc"
+--       | "nil"
 --       | "ze"
+--       | "end"
 --       | "(" TERM "," TERM ")"
---       | "[" TERM*   { "," TERM   } "]"
---       | "{" TERM*   { "," TERM   } "}"
---       | "{" BRANCH* { ";" BRANCH } "}"
+--       | "[" TERM* { "," TERM } "]"
+--       | "{" TERM* { "," TERM } "}"
+--       | "switch" TERM "{" BRANCH* { ";" BRANCH } "}"
 --       | "(" TERM ")"
 --
 -- LABEL ∷= "'" ID
@@ -48,7 +52,7 @@ ty = tm₀
 tm₀ = lam <|> let_ <|> tm₁
 tm₁ = pi  <|> arrow
 tm₂ = sg  <|> prod
-tm₃ = fst <|> snd  <|> tag <|> su <|> case_ <|> app
+tm₃ = case_ <|> tag <|> fst <|> snd <|> cons <|> elimEnum <|> su <|> suc <|> elimTag <|> arg <|> rec_ <|> app
 
 cell ∷ Parser (Name , Raw)
 cell = parens do
@@ -112,20 +116,38 @@ prod = do
     𝕓 ← tm₂
     return $ Sg "_" 𝕒 𝕓
 
+case_ ∷ Parser Raw
+case_ = reserved "Case" >> Case <$> atom <*> atom
+
+tag ∷ Parser Raw
+tag = reserved "Tag" >> Tag <$> atom
+
 fst ∷ Parser Raw
 fst = reserved "fst" >> Fst <$> atom
 
 snd ∷ Parser Raw
 snd = reserved "snd" >> Snd <$> atom
 
-tag ∷ Parser Raw
-tag = reserved "Tag" >> Tag <$> atom
+cons ∷ Parser Raw
+cons = reserved "cons" >> Cons <$> atom <*> atom
+
+elimEnum ∷ Parser Raw
+elimEnum = reserved "elimEnum" >> ElimEnum <$> atom <*> atom <*> atom <*> atom
 
 su ∷ Parser Raw
 su = reserved "su" >> Su <$> atom
 
-case_ ∷ Parser Raw
-case_ = reserved "Case" >> Case <$> atom <*> atom
+suc ∷ Parser Raw
+suc = reserved "suc" >> Suc <$> atom
+
+elimTag ∷ Parser Raw
+elimTag = reserved "elimTag" >> ElimTag <$> atom <*> atom <*> atom <*> atom
+
+arg ∷ Parser Raw
+arg = reserved "arg" >> Arg <$> atom <*> atom
+
+rec_ ∷ Parser Raw
+rec_ = reserved "rec" >> Rec <$> atom
 
 app ∷ Parser Raw
 app = do
@@ -134,9 +156,14 @@ app = do
 
 atom ∷ Parser Raw
 atom = var
-   <|> set <|> unit <|> labelTy <|> enum
+   <|> set <|> unit <|> labelTy <|> enum <|> desc <|> Parser.nat
    <|> tick
+   <|> sharp
+   <|> nil
    <|> ze
+   <|> zero
+   <|> end
+   <|> litNat
    <|> pair
    <|> bracket
    <|> brace
@@ -158,14 +185,32 @@ labelTy = reserved "Label" $> Label
 enum ∷ Parser Raw
 enum = reserved "Enum" $> Enum
 
+desc ∷ Parser Raw
+desc = reserved "Desc" $> Desc
+
+nat ∷ Parser Raw
+nat = (reserved "ℕ" <|> reserved "Nat") $> Nat
+
 tick ∷ Parser Raw
 tick = Tick <$> label
 
 sharp ∷ Parser Raw
 sharp = Sharp <$> index
 
+nil ∷ Parser Raw
+nil = reserved "nil" $> Nil
+
 ze ∷ Parser Raw
 ze = reserved "ze" $> Ze
+
+zero ∷ Parser Raw
+zero = reserved "zero" $> Zero
+
+end ∷ Parser Raw
+end = reserved "end" $> End
+
+litNat ∷ Parser Raw
+litNat = Raw.nat <$> natural
 
 pair ∷ Parser Raw
 pair = try $ parens do
@@ -177,7 +222,7 @@ bracket ∷ Parser Raw
 bracket = Bracket <$> brackets (commaSep tm₀)
 
 brace ∷ Parser Raw
-brace = try $ Brace <$> braces (commaSep tm₀)
+brace = Brace <$> braces (commaSep tm₀)
 
 branch ∷ Parser (String , Raw)
 branch = do
@@ -187,4 +232,9 @@ branch = do
   return (l , t)
 
 switch ∷ Parser Raw
-switch = Switch <$> braces (semiSep1 branch)
+switch = do
+  reserved "switch"
+  mot ← atom
+  ts  ← braces (semiSep1 branch)
+  let e = Brace $ map (Tick . (\ (a , _) → a)) ts
+  return $ Lam "@t" (Just (Tag e)) $ Switch (Var "@t") mot ts
