@@ -18,7 +18,7 @@ data Msg = OutOfScope
          | CantInfer    Raw
          | RequireNonEmpty
          | TagNotInEnum
-         | TypeMismatch
+         | TypeMismatch Raw VTy VTy
          deriving (Eq, Show)
 
 find ∷ (a → Bool) → [a] → Maybe (Int , a)
@@ -172,7 +172,7 @@ infer = \case
   t@(R.Su    _) → throwError $ CantInfer t
   t@(R.Sharp _) → throwError $ CantInfer t
 
-  R.ElimTag scrut mot ze su →
+  raw@(R.ElimTag scrut mot ze su) →
     infer scrut >>= \case
       (scrut , V.Tag e) → do
         scrutᵥ ← eval scrut
@@ -189,13 +189,34 @@ infer = \case
         ze ← check ze zeTy
         su ← check su suTy
         return (T.ElimTag scrut mot ze su , motᵥ `app` e `app` scrutᵥ)
-      _ → throwError $ TypeMismatch
+      (_ , 𝕒) → throwError $ TypeMismatch raw (V.Tag V.Set) 𝕒
+
+  raw@(R.Elim scrut mot ϕ) →
+    infer scrut >>= \case
+      (scrut , V.Mu d) → do
+        scrutᵥ ← eval scrut
+        let motTy = V.Mu d `V.arrow` V.Set
+        mot  ← check mot motTy
+        motᵥ ← eval  mot
+        let methodsTy = V.pi (decode d (V.Mu d)) \ ds → hyps d (V.Mu d) motᵥ ds `V.arrow` (motᵥ `app` V.Inj ds)
+        ϕ ← check ϕ methodsTy
+        return (T.Elim scrut mot ϕ , motᵥ `app` scrutᵥ)
+      (_ , 𝕒) → throwError $ TypeMismatch raw (V.Mu V.Set) 𝕒
 
   R.Case e p → do
     eₜ ← check e V.Enum
     eᵥ ← eval  eₜ
     p  ← check p (V.Tag eᵥ `V.arrow` V.Set)
     return (T.Case eₜ p , V.Set)
+
+  R.Hyps d x p xs → do
+    d ← check d V.Desc
+    dᵥ ← eval d
+    x ← check x V.Set
+    xᵥ ← eval x
+    p ← check p (xᵥ `V.arrow` V.Set)
+    xs ← check xs (decode dᵥ xᵥ)
+    return (T.Hyps d x p xs , V.Set)
 
   R.Switch t p branches → do
     let eᵣ = R.Brace   $ map (R.Tick . Prelude.fst) branches
@@ -208,6 +229,17 @@ infer = \case
     pᵥ ← eval  pₜ
     ϕₜ ← check ϕᵣ (Eval.case_ eᵥ pᵥ)
     return (T.Switch tₜ pₜ ϕₜ , pᵥ `app` tᵥ)
+
+  R.Mu d → do
+    d ← check d V.Desc
+    return (T.Mu d , V.Set)
+
+  t@(R.Inj _) → throwError $ CantInfer t
+
+  R.El d x → do
+    d ← check d V.Desc
+    x ← check x V.Set
+    return (T.El d x , V.Set)
 
   R.Let name 𝕒 t body → do
     𝕒  ← check 𝕒 V.Set
@@ -237,6 +269,10 @@ check t expected = case (t , expected) of
     ts ← check (R.Bracket ts) =<< (resume 𝕓 <$> eval t)
     return $ T.Pair t ts
 
+  (R.Inj ϕ , V.Mu d) → do
+    ϕ ← check ϕ (decode d (V.Mu d))
+    return $ T.Inj ϕ
+
   (R.Ze , V.Tag e) → case e of
     V.Cons l e → T.Ze <$> quote V.Label l <*> quote V.Enum e
     _ → throwError RequireNonEmpty
@@ -251,11 +287,11 @@ check t expected = case (t , expected) of
                     else T.Su (T.Tick this) <$> quote V.Enum e <*> check (R.Sharp l) (V.Tag e)
     _ → throwError TagNotInEnum
 
-  _ → do
+  (raw , _) → do
     (t , actual) ← infer t
     conv V.Set expected actual >>= \case
       True  → return t
-      False → throwError TypeMismatch
+      False → throwError $ TypeMismatch raw expected actual
 
 runElab₀ ∷ Eff [Reader Env, Reader Ctx, Reader Len, Error e] a → Either e a
 runElab₀ = runPureEff

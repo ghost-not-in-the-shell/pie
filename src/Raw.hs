@@ -31,6 +31,7 @@ data Raw
   | Brace [Raw]
   | ElimEnum Raw Raw Raw Raw
   | Case Raw Raw
+  | Hyps Raw Raw Raw Raw
 
   | Ze
   | Su Raw
@@ -44,6 +45,12 @@ data Raw
   | End
   | Arg Raw Raw
   | Rec Raw
+  | El Raw Raw
+
+  | Mu Raw
+  | Inj Raw
+
+  | Elim Raw Raw Raw
 
   | Let Name RTy Raw Raw
   deriving (Eq, Show)

@@ -13,6 +13,12 @@ instance Show (Clo val) where
   show (HOAS _) = "HOAS"
   show (Subst (t , ρ)) = show (t , ρ)
 
+instance Eq (Clo val) where
+  (==) (HOAS _) (HOAS _) = True
+  (==) (HOAS _) (Subst _) = False
+  (==) (Subst _) (HOAS _) = False
+  (==) (Subst a) (Subst b) = a == b
+
 type VTy = Val
 data Val
   = Pi VTy (Clo VTy)
@@ -46,8 +52,11 @@ data Val
   | Arg Val Val
   | Rec Val
 
+  | Mu Val
+  | Inj Val
+
   | Stuck (Ne , VTy)
-  deriving (Show)
+  deriving (Eq, Show)
 
 data Ne
   = Var Lv
@@ -59,7 +68,10 @@ data Ne
   | Case     Ne Val
   | Switch   Val Ne Val Val
   | El       Ne Val
-  deriving (Show)
+  | Elim     Val Ne Val Val
+  | Hyps     Ne Val Val Val
+  | All      Ne Val Val Val Val
+  deriving (Eq, Show)
 
 pi ∷ Val → (Val → Val) → Val
 pi 𝕒 𝕓 = Pi 𝕒 (HOAS 𝕓)

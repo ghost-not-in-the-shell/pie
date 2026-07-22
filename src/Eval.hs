@@ -1,9 +1,9 @@
 module Eval where
-import Prelude hiding (lookup, fst, snd)
+import Prelude hiding (lookup, fst, snd, all)
 import Effectful
 import Effectful.Reader.Static
 import Var
-import Core as T hiding (case_)
+import Core as T
 import Val  as V
 import Impossible
 
@@ -58,6 +58,22 @@ elimTag scrut mot ze su = case scrut of
     → V.Stuck (V.ElimTag ne mot ze su , mot `app` e `app` scrut)
   _ → error "elimTag"
 
+all ∷ Val → Val → Val → Val → Val → Val
+all d x p ϕ xs = case d of
+  V.End     → V.Sole
+  V.Arg s d →                             all (d `app` s) x p ϕ (snd xs)
+  V.Rec   d → (ϕ `app` (fst xs)) `V.Pair` all  d          x p ϕ (snd xs)
+  V.Stuck (ne , V.Desc)
+    → V.Stuck (V.All ne x p ϕ xs , V.Stuck (V.Hyps ne x p xs , V.Set))
+  _ → error "all"
+
+elim ∷ Val → Val → Val → Val
+elim scrut p ϕ = case scrut of
+  V.Inj ds → ϕ `app` ds `app` all scrut (V.Mu scrut) p (elim scrut p ϕ) ds
+  V.Stuck (ne , V.Mu d)
+    → V.Stuck (V.Elim d ne p ϕ , p `app` scrut)
+  _ → error "elim"
+
 case_ ∷ Val → Val → Val
 case_ e p = case e of
   V.Nil → V.Unit
@@ -72,16 +88,25 @@ switch t p cs = case t of
   V.Su l e t → switch t (V.lam \ t → p `app` V.Su l e t) (snd cs)
   V.Stuck (ne , V.Tag e)
     → V.Stuck (V.Switch e ne p cs , p `app` t)
-  _ → error "switch"
+  t → error $ "switch: " ++ show t
 
 decode ∷ Val → Val → Val
 decode d x = case d of
   V.End → V.Unit
-  V.Arg s d → V.pi s \ s → decode (d `app` s) x
-  V.Rec d → x `V.prod` decode d x
+  V.Arg s d → V.sg s \ s →    decode (d `app` s) x
+  V.Rec   d →      x `V.prod` decode  d          x
   V.Stuck (ne , V.Desc)
     → V.Stuck (V.El ne x , V.Set)
   _ → error "decode"
+
+hyps ∷ Val → Val → Val → Val → Val
+hyps d x p xs = case d of
+  V.End     → V.Unit
+  V.Arg s d →                           hyps (d `app` s) x p (snd xs)
+  V.Rec   d → p `app` (fst xs) `V.prod` hyps  d          x p (snd xs)
+  V.Stuck (ne , V.Desc)
+    → V.Stuck (V.Hyps ne x p xs , V.Set)
+  _ → error "hyps"
 
 eval ∷ Reader Env :> es ⇒ Tm → Eff es Val
 eval = \case
@@ -110,9 +135,21 @@ eval = \case
   T.End      → return  V.End
   T.Arg  s d → V.Arg  <$> eval s <*> eval d
   T.Rec  d   → V.Rec  <$> eval d
+  T.Mu   d   → V.Mu   <$> eval d
+  T.Inj  ϕ   → V.Inj  <$> eval ϕ
   T.Ze l e   → V.Ze   <$> eval l <*> eval e
   T.Su l e t → V.Su   <$> eval l <*> eval e <*> eval t
   T.Let  t u → resume <$> stop u <*> eval t
+  T.All d x p ϕ xs →
+    all <$> eval d
+        <*> eval x
+        <*> eval p
+        <*> eval ϕ
+        <*> eval xs
+  T.Elim scrut p ϕ →
+    elim <$> eval scrut
+         <*> eval p
+         <*> eval ϕ
   T.ElimEnum scrut mot nil cons →
     elimEnum <$> eval scrut
              <*> eval mot
@@ -129,6 +166,7 @@ eval = \case
            <*> eval p
            <*> eval cs
   T.El d x → decode <$> eval d <*> eval x
+  T.Hyps d x p ϕ → hyps <$> eval d <*> eval x <*> eval p <*> eval ϕ
 
 eval₀ ∷ Tm → Val
 eval₀ = runPureEff . runReader @Env [] . eval

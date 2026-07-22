@@ -28,6 +28,9 @@ quoteTy = \case
     𝕓ₜ ← bind 𝕒 \ x → quoteTy (resume 𝕓 x)
     return $ T.Sg 𝕒ₜ 𝕓ₜ
 
+  V.Mu d → do
+    T.Mu <$> quote V.Desc d
+
   V.Set   → return T.Set
   V.Unit  → return T.Unit
   V.Label → return T.Label
@@ -51,6 +54,7 @@ quoteTy = \case
   V.End → impossible
   V.Arg _ _ → impossible
   V.Rec _ → impossible
+  V.Inj _ → impossible
   V.Stuck _ → impossible
 
 quote ∷ Reader Len :> es ⇒ VTy → Val → Eff es Tm
@@ -110,6 +114,11 @@ quote 𝕒 t = case 𝕒 of
     V.Stuck (ne , V.Desc) → quoteNe ne
     _ → error $ show t
 
+  V.Mu d → case t of
+    V.Inj ϕ → T.Inj <$> quote (decode d (V.Mu d)) ϕ
+    V.Stuck (ne , V.Mu _) → quoteNe ne
+    _ → error $ "mu"
+
   V.Stuck _ → case t of
     V.Stuck (ne , _) → quoteNe ne
     _ → error $ "stuck: " ++ show t
@@ -125,6 +134,13 @@ quoteNe = \case
   V.Fst t → T.Fst <$> quoteNe t
   V.Snd t → T.Snd <$> quoteNe t
   V.App t (u , 𝕒) → T.App <$> quoteNe t <*> quote 𝕒 u
+
+  V.Elim d ds p ϕ →
+    let pTy = V.Mu d `V.arrow` V.Set in
+    let ϕTy = V.pi (decode d (V.Mu d)) \ ds → hyps d (V.Mu d) p ds `V.arrow` (p `app` V.Inj ds) in
+    T.Elim <$> quoteNe ds
+           <*> quote pTy p
+           <*> quote ϕTy ϕ
 
   V.ElimEnum scrut mot nil cons →
     let motTy  = V.Enum `V.arrow` V.Set in
@@ -162,6 +178,24 @@ quoteNe = \case
     T.Switch <$> quoteNe t
              <*> quote pTy  p
              <*> quote csTy cs
+
+  V.Hyps ne x p xs →
+    let pTy = x `V.arrow` V.Set in
+    let xsTy = V.Stuck (V.El ne x , V.Set) in
+    T.Hyps <$> quoteNe ne
+           <*> quote V.Set x
+           <*> quote pTy p
+           <*> quote xsTy xs
+
+  V.All d x p ϕ xs →
+    let pTy = x `V.arrow` V.Set in
+    let ϕTy = V.pi x \ x → p `app` x in
+    let xsTy = V.Stuck (V.El d x ,V.Set) in
+    T.All <$> quoteNe d
+          <*> quote V.Set x
+          <*> quote pTy p
+          <*> quote ϕTy ϕ
+          <*> quote xsTy xs
 
   V.El d x →
     T.El <$> quoteNe d <*> quoteTy x

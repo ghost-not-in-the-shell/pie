@@ -12,7 +12,7 @@ import Raw hiding (lam)
 --       | "fst" ATOM | "snd" ATOM
 --       | "cons" ATOM ATOM | "elimEnum" ATOM ATOM ATOM ATOM
 --       | "su"   ATOM      | "elimTag" ATOM ATOM ATOM ATOM
---       | "arg" ATOM ATOM | "rec" ATOM
+--       | "arg" ATOM ATOM | "rec" ATOM | "elim" ATOM ATOM ATOM
 --       | "λ"   NAME+ "⇒" TERM
 --       | "let" NAME  ":" TERM "=" TERM "in" TERM
 --       | APP
@@ -44,7 +44,7 @@ prog ∷ Parser Raw
 prog = whiteSpace *> tm₀ <* eof
 
 parseProg ∷ String → Either ParseError Raw
-parseProg = parse prog "<stdin>"
+parseProg = runParser prog 0 "<stdin>"
 
 ty ∷ Parser RTy
 ty = tm₀
@@ -52,7 +52,7 @@ ty = tm₀
 tm₀ = lam <|> let_ <|> tm₁
 tm₁ = pi  <|> arrow
 tm₂ = sg  <|> prod
-tm₃ = case_ <|> tag <|> fst <|> snd <|> cons <|> elimEnum <|> su <|> suc <|> elimTag <|> arg <|> rec_ <|> app
+tm₃ = case_ <|> hyps <|> tag <|> fst <|> snd <|> cons <|> elimEnum <|> su <|> suc <|> elimTag <|> arg <|> rec_ <|> mu <|> inj <|> elim <|> app
 
 cell ∷ Parser (Name , Raw)
 cell = parens do
@@ -119,6 +119,9 @@ prod = do
 case_ ∷ Parser Raw
 case_ = reserved "Case" >> Case <$> atom <*> atom
 
+hyps ∷ Parser Raw
+hyps = reserved "Hyps" >> Hyps <$> atom <*> atom <*> atom <*> atom
+
 tag ∷ Parser Raw
 tag = reserved "Tag" >> Tag <$> atom
 
@@ -131,6 +134,9 @@ snd = reserved "snd" >> Snd <$> atom
 cons ∷ Parser Raw
 cons = reserved "cons" >> Cons <$> atom <*> atom
 
+elim ∷ Parser Raw
+elim = reserved "elim" >> Elim <$> atom <*> atom <*> atom
+
 elimEnum ∷ Parser Raw
 elimEnum = reserved "elimEnum" >> ElimEnum <$> atom <*> atom <*> atom <*> atom
 
@@ -139,6 +145,13 @@ su = reserved "su" >> Su <$> atom
 
 suc ∷ Parser Raw
 suc = reserved "suc" >> Suc <$> atom
+
+mu ∷ Parser Raw
+mu = reserved "μ" >> Mu <$> atom
+
+inj ∷ Parser Raw
+inj = reserved "inj" >> Inj <$> atom
+
 
 elimTag ∷ Parser Raw
 elimTag = reserved "elimTag" >> ElimTag <$> atom <*> atom <*> atom <*> atom
@@ -168,6 +181,7 @@ atom = var
    <|> bracket
    <|> brace
    <|> switch
+   <|> decode
    <|> parens tm₀
 
 var ∷ Parser Raw
@@ -237,4 +251,17 @@ switch = do
   mot ← atom
   ts  ← braces (semiSep1 branch)
   let e = Brace $ map (Tick . (\ (a , _) → a)) ts
-  return $ Lam "@t" (Just (Tag e)) $ Switch (Var "@t") mot ts
+  n ← getState
+  modifyState (+1)
+  let name = "@t" ++ show n
+  return $ Lam name (Just (Tag e)) $ Switch (Var name) mot ts
+
+decode ∷ Parser Raw
+decode = do
+  void $ symbol "⟦"
+  d ← tm₀
+  void $ symbol "⟧"
+  n ← getState
+  modifyState (+1)
+  let name = "@X" ++ show n
+  return $ Lam name (Just Set) $ El d (Var name)

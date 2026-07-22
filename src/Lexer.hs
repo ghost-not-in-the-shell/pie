@@ -3,9 +3,9 @@ import Text.Parsec
 import Text.Parsec.Token as Token
 import Var
 
-type Parser = Parsec String ()
+type Parser = Parsec String Int
 
-lexer ∷ TokenParser ()
+lexer ∷ TokenParser Int
 lexer = makeTokenParser LanguageDef
   { commentStart    = "{-"
   , commentEnd      = "-}"
@@ -17,8 +17,8 @@ lexer = makeTokenParser LanguageDef
   , reservedOpNames = undefined
   , identStart      = letter
   , identLetter     = alphaNum <|> char '_' <|> char '\''
-  , reservedNames   = [ "Set", "𝟙", "Unit", "Label", "Enum", "Desc", "ℕ", "Nat", "Tag", "Case"
-                      , "λ", "fun", "fst", "snd", "nil", "cons", "elimEnum", "ze", "su", "elimTag", "switch", "end", "arg", "rec", "zero", "suc"
+  , reservedNames   = [ "Set", "𝟙", "Unit", "Label", "Enum", "Desc", "ℕ", "Tag", "Case", "Hyps"
+                      , "λ", "fun", "fst", "snd", "nil", "cons", "elimEnum", "ze", "su", "zero", "suc", "elimTag", "switch", "end", "arg", "rec", "El", "elim", "μ", "Mu", "inj"
                       , "let", "in" ]
   }
 
