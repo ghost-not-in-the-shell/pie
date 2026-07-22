@@ -253,7 +253,7 @@ switch = do
   let e = Brace $ map (Tick . (\ (a , _) → a)) ts
   n ← getState
   modifyState (+1)
-  let name = "@t" ++ show n
+  let name = "@t" -- ++ show n
   return $ Lam name (Just (Tag e)) $ Switch (Var name) mot ts
 
 decode ∷ Parser Raw
@@ -263,5 +263,5 @@ decode = do
   void $ symbol "⟧"
   n ← getState
   modifyState (+1)
-  let name = "@X" ++ show n
+  let name = "@X" -- ++ show n
   return $ Lam name (Just Set) $ El d (Var name)

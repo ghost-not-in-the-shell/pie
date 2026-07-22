@@ -200,7 +200,8 @@ infer = \case
         motᵥ ← eval  mot
         let methodsTy = V.pi (decode d (V.Mu d)) \ ds → hyps d (V.Mu d) motᵥ ds `V.arrow` (motᵥ `app` V.Inj ds)
         ϕ ← check ϕ methodsTy
-        return (T.Elim scrut mot ϕ , motᵥ `app` scrutᵥ)
+        d ← quote V.Desc d
+        return (T.Elim d scrut mot ϕ , motᵥ `app` scrutᵥ)
       (_ , 𝕒) → throwError $ TypeMismatch raw (V.Mu V.Set) 𝕒
 
   R.Case e p → do

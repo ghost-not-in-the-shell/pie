@@ -54,7 +54,7 @@ data Tm
 
   | Hyps Tm Tm Tm Tm
   | All Tm Tm Tm Tm Tm
-  | Elim Tm Tm Tm
+  | Elim Tm Tm Tm Tm
 
   | Let Tm (Bnd Tm)
   deriving (Eq, Show)
@@ -124,7 +124,7 @@ close name = Bnd . go 0
           Inj ϕ → Inj (go acc ϕ)
 
           Hyps d x p ds → Hyps (go acc d) (go acc x) (go acc p) (go acc ds)
-          Elim scrut p ϕ → Elim (go acc scrut) (go acc p) (go acc ϕ)
+          Elim d scrut p ϕ → Elim (go acc d) (go acc scrut) (go acc p) (go acc ϕ)
 
 pi ∷ Name → Ty → Ty → Ty
 pi x 𝕒 𝕓 = Pi 𝕒 (close x 𝕓)

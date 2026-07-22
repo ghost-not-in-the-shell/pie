@@ -244,8 +244,7 @@ add =
       "λ xs ihs ⇒ zero in " ++
     "let sucB : (xs : ⟦ sucD ⟧ Nat_) (ihs : Hyps sucD Nat_ Toℕ xs) → Toℕ (inj (#suc_ , xs)) = " ++
       "λ xs ihs ⇒ suc (fst ihs) in " ++
-    "let foo : (t : Tag NatE) (ds : ⟦ NatC t ⟧ Nat_) (ihs : Hyps NatD Nat_ Toℕ (t , ds)) → Set = " ++
-      "λ t ds ihs ⇒ ℕ in " ++
+
       {-
     "let toℕα : (xs : ⟦ NatD ⟧ Nat_) (ihs : Hyps NatD Nat_ Toℕ xs) → Toℕ (inj xs) = " ++
       "λ xs ⇒ switch (λ (t : Tag NatE) ⇒ (ds : ⟦ NatC t ⟧ Nat_) (ihs : Hyps NatD Nat_ Toℕ (t , ds)) → Toℕ (inj (t , ds))) " ++
@@ -253,7 +252,6 @@ add =
       "; #suc_  ⇒ sucB } " ++
       "(fst xs) (snd xs) in " ++
 -}
-{-      
     "let toℕ : Nat_ → ℕ = λ n ⇒ elim n " ++
       "Toℕ" ++
       "(curry (Tag NatE) " ++
@@ -262,12 +260,12 @@ add =
          "(switch (λ t ⇒ (ds : ⟦ NatC t ⟧ Nat_) → Hyps NatD Nat_ Toℕ (t , ds) → Toℕ (inj (t , ds))) " ++
          "{ #zero_ ⇒ λ ds hs ⇒ zero " ++
          "; #suc_  ⇒ λ ds hs ⇒ suc (fst hs) } )) in " ++
--}
-    "zero" 
+    "let three : Nat_ = suc_ (suc_ (suc_ zero_)) in " ++
+    "toℕ three" 
 
   , Nothing
 
-  , T.Zero )
+  , T.Suc (T.Suc (T.Suc T.Zero)) )
 
 examples ∷ [(String , Maybe Raw , Tm)]
 examples = [ bracket_example, switch_example, identity, curry, uncurry, listE, append, toNat, bool, list, add ]

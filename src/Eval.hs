@@ -61,16 +61,16 @@ elimTag scrut mot ze su = case scrut of
 all ∷ Val → Val → Val → Val → Val → Val
 all d x p ϕ xs = case d of
   V.End     → V.Sole
-  V.Arg s d →                             all (d `app` s) x p ϕ (snd xs)
-  V.Rec   d → (ϕ `app` (fst xs)) `V.Pair` all  d          x p ϕ (snd xs)
+  V.Arg 𝕤 d →                             all (d `app` (fst xs)) x p ϕ (snd xs)
+  V.Rec   d → (ϕ `app` (fst xs)) `V.Pair` all  d                 x p ϕ (snd xs)
   V.Stuck (ne , V.Desc)
     → V.Stuck (V.All ne x p ϕ xs , V.Stuck (V.Hyps ne x p xs , V.Set))
-  _ → error "all"
+  _ → error $ "all: " ++ show d
 
-elim ∷ Val → Val → Val → Val
-elim scrut p ϕ = case scrut of
-  V.Inj ds → ϕ `app` ds `app` all scrut (V.Mu scrut) p (elim scrut p ϕ) ds
-  V.Stuck (ne , V.Mu d)
+elim ∷ Val → Val → Val → Val → Val
+elim d scrut p ϕ = case scrut of
+  V.Inj ds → ϕ `app` ds `app` all d (V.Mu d) p (V.lam \ ds → elim d ds p ϕ) ds
+  V.Stuck (ne , V.Mu _)
     → V.Stuck (V.Elim d ne p ϕ , p `app` scrut)
   _ → error "elim"
 
@@ -102,8 +102,8 @@ decode d x = case d of
 hyps ∷ Val → Val → Val → Val → Val
 hyps d x p xs = case d of
   V.End     → V.Unit
-  V.Arg s d →                           hyps (d `app` s) x p (snd xs)
-  V.Rec   d → p `app` (fst xs) `V.prod` hyps  d          x p (snd xs)
+  V.Arg 𝕤 d →                           hyps (d `app` (fst xs)) x p (snd xs)
+  V.Rec   d → p `app` (fst xs) `V.prod` hyps  d                 x p (snd xs)
   V.Stuck (ne , V.Desc)
     → V.Stuck (V.Hyps ne x p xs , V.Set)
   _ → error "hyps"
@@ -146,8 +146,9 @@ eval = \case
         <*> eval p
         <*> eval ϕ
         <*> eval xs
-  T.Elim scrut p ϕ →
-    elim <$> eval scrut
+  T.Elim d scrut p ϕ →
+    elim <$> eval d
+         <*> eval scrut
          <*> eval p
          <*> eval ϕ
   T.ElimEnum scrut mot nil cons →

@@ -138,7 +138,8 @@ quoteNe = \case
   V.Elim d ds p ϕ →
     let pTy = V.Mu d `V.arrow` V.Set in
     let ϕTy = V.pi (decode d (V.Mu d)) \ ds → hyps d (V.Mu d) p ds `V.arrow` (p `app` V.Inj ds) in
-    T.Elim <$> quoteNe ds
+    T.Elim <$> quote V.Desc d
+           <*> quoteNe ds
            <*> quote pTy p
            <*> quote ϕTy ϕ
 
